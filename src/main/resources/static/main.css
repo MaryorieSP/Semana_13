@@ -1,3 +1,14 @@
 body{
-    background-color: rgb(231, 201, 172);
+    background-color: rgb(184, 253, 238);
+}
+
+table {
+    border-collapse: collapse;
+    align-items: center;
+}
+
+td, th {
+    border: 1px solid #999;
+    padding: 0.5rem;
+    text-align: left;
 }
