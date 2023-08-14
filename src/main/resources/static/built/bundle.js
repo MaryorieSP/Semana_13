@@ -40869,7 +40869,7 @@ var _require = __webpack_require__(/*! react-router-dom */ "./node_modules/react
 var PageEditarMusico = function PageEditarMusico() {
   var _useParams = useParams(),
     id = _useParams.id;
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h1", null, "Editar Musico: ", id), /*#__PURE__*/React.createElement("form", null), /*#__PURE__*/React.createElement(Link, {
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h1", null, "Editar Musico: ", id), /*#__PURE__*/React.createElement(Link, {
     to: "/"
   }, "Volver"));
 };

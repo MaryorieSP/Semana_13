@@ -8,9 +8,6 @@ const PageEditarMusico = ()=>{
     return(
         <>
             <h1>Editar Musico: {id}</h1>
-            <form>
-                
-            </form>
             <Link to="/">Volver</Link>
         </>
     )
