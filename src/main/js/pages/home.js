@@ -71,7 +71,7 @@ class MusicoList extends React.Component {
 				<tbody>
 					<tr>
 						<th>Nombre</th>
-						<th>Acciones</th>
+						<th colspan="2">Acciones</th>
 					</tr>
 					{musicos}
 				</tbody>
@@ -87,7 +87,7 @@ class Instrumento extends React.Component {
 			<tr>
 				<td>{this.props.instrumento.nombre}</td>
 				<td>
-					<Link to={`/ver-instrumento/${id}`}>Ver</Link>
+					<Link to={`/ver-instrumento/${id}`}>Ver</Link> | <Link to={`/editar-instrumento/${id}`}>Editar</Link>
 				</td>
 			</tr>
 		)
