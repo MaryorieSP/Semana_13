@@ -1,37 +1,57 @@
 const React = require('react');
 const client = require('../client');
 const { Link, useParams, } = require('react-router-dom');
-const {useState} = require('react');
+const {useState, useEffect} = require('react');
+
+
 
 const PageVerBanda = (props) => {
 
-    // const id = props.match.params.id;
     let { id } = useParams();
     const [banda, setBanda] = useState({});
+    const [integrantes, setIntegrantes] = useState([]);
 
-    client({
-        method: 'GET',
-        path: '/api/bandas/' + id
-    }).done(response => {
-        setBanda(response.entity);
-        // console.log(response.entity);
-    });
+
+    useEffect(() => {
+        url_banda = '/api/bandas/' + id
+
+        client({
+            method: 'GET',
+            path: url_banda
+        }).done(response => setBanda(response.entity));
+
+        client({
+            method: 'GET',
+            path: url_banda + '/formacion'
+        }).done(response => setIntegrantes(response.entity))
+        
+    }, []);
 
 
     return (
         <>
-            <h1>Ver Banda</h1>
+            <h1>Banda</h1>
             <table>
-                <tr>
-                    <th>Nombre</th>
-                    <td>{banda.nombre}</td>
-                </tr>
+                <tbody>
+                    <tr>
+                        <th>Nombre</th>
+                        <td>{banda.nombre}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <hr />
+
+            <h2>integrantes</h2>
+            <table>
+                <thead>
+                    
+                </thead>
             </table>
 
             <Link to="/">Volver</Link>
         </>
     )
-
 }
 
-module.exports=PageVerBanda;
+module.exports = PageVerBanda;
