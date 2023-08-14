@@ -40803,6 +40803,7 @@ var PageHome = __webpack_require__(/*! ./pages/home */ "./src/main/js/pages/home
 var PageVerInstrumento = __webpack_require__(/*! ./pages/ver-instrumento */ "./src/main/js/pages/ver-instrumento.js");
 var PageNuevoInstrumento = __webpack_require__(/*! ./pages/nuevo-instrumento */ "./src/main/js/pages/nuevo-instrumento.js");
 var PageNuevoMusico = __webpack_require__(/*! ./pages/nuevo-musico */ "./src/main/js/pages/nuevo-musico.js");
+var PageEditarMusico = __webpack_require__(/*! ./pages/editar-musico */ "./src/main/js/pages/editar-musico.js");
 var router = createBrowserRouter([{
   path: '/',
   element: /*#__PURE__*/React.createElement(PageHome, null)
@@ -40815,6 +40816,9 @@ var router = createBrowserRouter([{
 }, {
   path: '/nuevo-musico',
   element: /*#__PURE__*/React.createElement(PageNuevoMusico, null)
+}, {
+  path: '/editar-musico',
+  element: /*#__PURE__*/React.createElement(PageEditarMusico, null)
 }]);
 ReactDOM.render( /*#__PURE__*/React.createElement(React.StrictMode, null, /*#__PURE__*/React.createElement(RouterProvider, {
   router: router
@@ -40848,6 +40852,28 @@ module.exports = rest.wrap(mime, {
     'Accept': 'application/hal+json'
   }
 });
+
+/***/ }),
+
+/***/ "./src/main/js/pages/editar-musico.js":
+/*!********************************************!*\
+  !*** ./src/main/js/pages/editar-musico.js ***!
+  \********************************************/
+/*! no static exports found */
+/***/ (function(module, exports, __webpack_require__) {
+
+var React = __webpack_require__(/*! react */ "./node_modules/react/index.js");
+var _require = __webpack_require__(/*! react-router-dom */ "./node_modules/react-router-dom/dist/index.js"),
+  useParams = _require.useParams,
+  Link = _require.Link;
+var PageEditarMusico = function PageEditarMusico() {
+  var _useParams = useParams(),
+    id = _useParams.id;
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h1", null, "Editar Musico: ", id), /*#__PURE__*/React.createElement("form", null), /*#__PURE__*/React.createElement(Link, {
+    to: "/"
+  }, "Volver"));
+};
+module.exports = PageEditarMusico;
 
 /***/ }),
 
@@ -40975,7 +41001,7 @@ var MusicoList = /*#__PURE__*/function (_React$Component3) {
       });
       return /*#__PURE__*/React.createElement("table", {
         border: "1"
-      }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Nombre")), musicos));
+      }, /*#__PURE__*/React.createElement("tbody", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", null, "Nombre"), /*#__PURE__*/React.createElement("th", null, "Acciones")), musicos));
     }
   }]);
   return MusicoList;
@@ -41008,7 +41034,10 @@ var Musico = /*#__PURE__*/function (_React$Component5) {
   _createClass(Musico, [{
     key: "render",
     value: function render() {
-      return /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, this.props.musico.nombre));
+      var id = this.props.musico._links.self.href.split("/").slice(-1);
+      return /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("td", null, this.props.musico.nombre), /*#__PURE__*/React.createElement("td", null, /*#__PURE__*/React.createElement(Link, {
+        to: "/editar-musico/".concat(id)
+      }, "Editar")));
     }
   }]);
   return Musico;

@@ -71,6 +71,7 @@ class MusicoList extends React.Component {
 				<tbody>
 					<tr>
 						<th>Nombre</th>
+						<th>Acciones</th>
 					</tr>
 					{musicos}
 				</tbody>
@@ -95,9 +96,13 @@ class Instrumento extends React.Component {
 
 class Musico extends React.Component {
 	render() {
+		const id = this.props.musico._links.self.href.split("/").slice(-1);
 		return (
 			<tr>
 				<td>{this.props.musico.nombre}</td>
+				<td>
+					<Link to={`/editar-musico/${id}`}>Editar</Link>
+				</td>
 			</tr>
 		)
 	}
