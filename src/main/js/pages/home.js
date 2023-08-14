@@ -40,7 +40,7 @@ class PageHome extends React.Component {
 
 					<div style={{"width":"calc(100% / 3"}}>
 
-						<Titulo entidad="Bandas" emoji="🎵" />
+						<Titulo entidad="Bandas" emoji="🥁" />
 						<BandaList bandas={this.state.bandas} />
 						<Link to="/nuevo-banda">Nuevo Banda</Link>
 					</div>

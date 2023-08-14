@@ -41272,7 +41272,7 @@ var PageHome = /*#__PURE__*/function (_React$Component) {
         }
       }, /*#__PURE__*/React.createElement(Titulo, {
         entidad: "Bandas",
-        emoji: "\uD83C\uDFB5"
+        emoji: "\uD83E\uDD41"
       }), /*#__PURE__*/React.createElement(BandaList, {
         bandas: this.state.bandas
       }), /*#__PURE__*/React.createElement(Link, {
