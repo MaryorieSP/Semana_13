@@ -11,7 +11,8 @@ const PageEditarInstrumento = require('./pages/editar-instrumento');
 const PageVerBanda = require ('./pages/ver-banda');
 const PageNuevoBanda = require('./pages/nuevo-banda');
 const PageEditarBanda = require('./pages/editar-banda');
-const PageVerMusico = require('./pages/ver-musico')
+const PageVerMusico = require('./pages/ver-musico');
+const PageNuevoIntegrante = require('./pages/nuevo-integrante');
 
 
 const router = createBrowserRouter([
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
 	{path: '/nuevo-banda', element: <PageNuevoBanda />},
 	{path: '/editar-banda/:id', element: <PageEditarBanda />},
 	{path: '/ver-musico/:id', element: <PageVerMusico />},
+	{path: '/ver-banda/:id/nuevo-integrante', element: <PageNuevoIntegrante />},
 ])
 
 
