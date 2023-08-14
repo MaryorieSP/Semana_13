@@ -90,7 +90,7 @@
 /*!*******************************************************!*\
   !*** ./node_modules/@remix-run/router/dist/router.js ***!
   \*******************************************************/
-/*! exports provided: AbortedDeferredError, Action, ErrorResponse, IDLE_BLOCKER, IDLE_FETCHER, IDLE_NAVIGATION, UNSAFE_DEFERRED_SYMBOL, UNSAFE_DeferredData, UNSAFE_convertRoutesToDataRoutes, UNSAFE_getPathContributingMatches, UNSAFE_invariant, UNSAFE_warning, createBrowserHistory, createHashHistory, createMemoryHistory, createPath, createRouter, createStaticHandler, defer, generatePath, getStaticContextFromError, getToPathname, isDeferredData, isRouteErrorResponse, joinPaths, json, matchPath, matchRoutes, normalizePathname, parsePath, redirect, resolvePath, resolveTo, stripBasename */
+/*! exports provided: AbortedDeferredError, Action, ErrorResponse, IDLE_BLOCKER, IDLE_FETCHER, IDLE_NAVIGATION, UNSAFE_DEFERRED_SYMBOL, UNSAFE_DeferredData, UNSAFE_convertRoutesToDataRoutes, UNSAFE_getPathContributingMatches, UNSAFE_invariant, UNSAFE_warning, createBrowserHistory, createHashHistory, createMemoryHistory, createPath, createRouter, createStaticHandler, defer, generatePath, getStaticContextFromError, getToPathname, isDeferredData, isRouteErrorResponse, joinPaths, json, matchPath, matchRoutes, normalizePathname, parsePath, redirect, redirectDocument, resolvePath, resolveTo, stripBasename */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -126,11 +126,12 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "normalizePathname", function() { return normalizePathname; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "parsePath", function() { return parsePath; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "redirect", function() { return redirect; });
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "redirectDocument", function() { return redirectDocument; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "resolvePath", function() { return resolvePath; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "resolveTo", function() { return resolveTo; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "stripBasename", function() { return stripBasename; });
 /**
- * @remix-run/router v1.7.2
+ * @remix-run/router v1.8.0
  *
  * Copyright (c) Remix Software Inc.
  *
@@ -335,6 +336,15 @@ function createHashHistory(options) {
       search = "",
       hash = ""
     } = parsePath(window.location.hash.substr(1));
+    // Hash URL should always have a leading / just like window.location.pathname
+    // does, so if an app ends up at a route like /#something then we add a
+    // leading slash so all of our path-matching behaves the same as if it would
+    // in a browser router.  This is particularly important when there exists a
+    // root splat route (<Route path="*">) since that matches internally against
+    // "/*" and we'd expect /#something to 404 in a hash router app.
+    if (!pathname.startsWith("/") && !pathname.startsWith(".")) {
+      pathname = "/" + pathname;
+    }
     return createLocation("", {
       pathname,
       search,
@@ -1297,6 +1307,16 @@ const redirect = function redirect(url, init) {
   return new Response(null, _extends({}, responseInit, {
     headers
   }));
+};
+/**
+ * A redirect response that will force a document reload to the new location.
+ * Sets the status code and the `Location` header.
+ * Defaults to "302 Found".
+ */
+const redirectDocument = (url, init) => {
+  let response = redirect(url, init);
+  response.headers.set("X-Remix-Reload-Document", "true");
+  return response;
 };
 /**
  * @private
@@ -2377,11 +2397,20 @@ function createRouter(init) {
       _isFetchActionRedirect: true
     } : {}));
     invariant(redirectLocation, "Expected a location on the redirect navigation");
-    // Check if this an absolute external redirect that goes to a new origin
-    if (ABSOLUTE_URL_REGEX.test(redirect.location) && isBrowser) {
-      let url = init.history.createURL(redirect.location);
-      let isDifferentBasename = stripBasename(url.pathname, basename) == null;
-      if (routerWindow.location.origin !== url.origin || isDifferentBasename) {
+    if (isBrowser) {
+      let isDocumentReload = false;
+      if (redirect.reloadDocument) {
+        // Hard reload if the response contained X-Remix-Reload-Document
+        isDocumentReload = true;
+      } else if (ABSOLUTE_URL_REGEX.test(redirect.location)) {
+        const url = init.history.createURL(redirect.location);
+        isDocumentReload =
+        // Hard reload if it's an absolute URL to a new origin
+        url.origin !== routerWindow.location.origin ||
+        // Hard reload if it's an absolute URL that does not match our basename
+        stripBasename(url.pathname, basename) == null;
+      }
+      if (isDocumentReload) {
         if (replace) {
           routerWindow.location.replace(redirect.location);
         } else {
@@ -2888,7 +2917,7 @@ function createStaticHandler(routes, opts) {
       // it to bail out and then return or throw here based on whether the user
       // returned or threw
       if (isQueryRouteResponse(e)) {
-        if (e.type === ResultType.error && !isRedirectResponse(e.response)) {
+        if (e.type === ResultType.error) {
           throw e.response;
         }
         return e.response;
@@ -3548,18 +3577,19 @@ async function callLoaderOrAction(type, request, match, matches, manifest, mapRo
         type: ResultType.redirect,
         status,
         location,
-        revalidate: result.headers.get("X-Remix-Revalidate") !== null
+        revalidate: result.headers.get("X-Remix-Revalidate") !== null,
+        reloadDocument: result.headers.get("X-Remix-Reload-Document") !== null
       };
     }
     // For SSR single-route requests, we want to hand Responses back directly
     // without unwrapping.  We do this with the QueryRouteResponse wrapper
     // interface so we can know whether it was returned or thrown
     if (opts.isRouteRequest) {
-      // eslint-disable-next-line no-throw-literal
-      throw {
-        type: resultType || ResultType.data,
+      let queryRouteResponse = {
+        type: resultType === ResultType.error ? ResultType.error : ResultType.data,
         response: result
       };
+      throw queryRouteResponse;
     }
     let data;
     let contentType = result.headers.get("Content-Type");
@@ -3905,7 +3935,7 @@ function isRedirectResponse(result) {
   return status >= 300 && status <= 399 && location != null;
 }
 function isQueryRouteResponse(obj) {
-  return obj && isResponse(obj.response) && (obj.type === ResultType.data || ResultType.error);
+  return obj && isResponse(obj.response) && (obj.type === ResultType.data || obj.type === ResultType.error);
 }
 function isValidMethod(method) {
   return validRequestMethods.has(method.toLowerCase());
@@ -29663,7 +29693,7 @@ if (false) {} else {
 /*!*****************************************************!*\
   !*** ./node_modules/react-router-dom/dist/index.js ***!
   \*****************************************************/
-/*! exports provided: AbortedDeferredError, Await, MemoryRouter, Navigate, NavigationType, Outlet, Route, Router, RouterProvider, Routes, UNSAFE_DataRouterContext, UNSAFE_DataRouterStateContext, UNSAFE_LocationContext, UNSAFE_NavigationContext, UNSAFE_RouteContext, UNSAFE_useRouteId, createMemoryRouter, createPath, createRoutesFromChildren, createRoutesFromElements, defer, generatePath, isRouteErrorResponse, json, matchPath, matchRoutes, parsePath, redirect, renderMatches, resolvePath, unstable_useBlocker, useActionData, useAsyncError, useAsyncValue, useHref, useInRouterContext, useLoaderData, useLocation, useMatch, useMatches, useNavigate, useNavigation, useNavigationType, useOutlet, useOutletContext, useParams, useResolvedPath, useRevalidator, useRouteError, useRouteLoaderData, useRoutes, BrowserRouter, Form, HashRouter, Link, NavLink, ScrollRestoration, UNSAFE_useScrollRestoration, createBrowserRouter, createHashRouter, createSearchParams, unstable_HistoryRouter, unstable_usePrompt, useBeforeUnload, useFetcher, useFetchers, useFormAction, useLinkClickHandler, useSearchParams, useSubmit */
+/*! exports provided: AbortedDeferredError, Await, MemoryRouter, Navigate, NavigationType, Outlet, Route, Router, RouterProvider, Routes, UNSAFE_DataRouterContext, UNSAFE_DataRouterStateContext, UNSAFE_LocationContext, UNSAFE_NavigationContext, UNSAFE_RouteContext, UNSAFE_useRouteId, createMemoryRouter, createPath, createRoutesFromChildren, createRoutesFromElements, defer, generatePath, isRouteErrorResponse, json, matchPath, matchRoutes, parsePath, redirect, redirectDocument, renderMatches, resolvePath, unstable_useBlocker, useActionData, useAsyncError, useAsyncValue, useHref, useInRouterContext, useLoaderData, useLocation, useMatch, useMatches, useNavigate, useNavigation, useNavigationType, useOutlet, useOutletContext, useParams, useResolvedPath, useRevalidator, useRouteError, useRouteLoaderData, useRoutes, BrowserRouter, Form, HashRouter, Link, NavLink, ScrollRestoration, UNSAFE_useScrollRestoration, createBrowserRouter, createHashRouter, createSearchParams, unstable_HistoryRouter, unstable_usePrompt, useBeforeUnload, useFetcher, useFetchers, useFormAction, useLinkClickHandler, useSearchParams, useSubmit */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -29746,6 +29776,8 @@ __webpack_require__.r(__webpack_exports__);
 
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "redirect", function() { return react_router__WEBPACK_IMPORTED_MODULE_1__["redirect"]; });
 
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "redirectDocument", function() { return react_router__WEBPACK_IMPORTED_MODULE_1__["redirectDocument"]; });
+
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "renderMatches", function() { return react_router__WEBPACK_IMPORTED_MODULE_1__["renderMatches"]; });
 
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "resolvePath", function() { return react_router__WEBPACK_IMPORTED_MODULE_1__["resolvePath"]; });
@@ -29794,7 +29826,7 @@ __webpack_require__.r(__webpack_exports__);
 
 /* harmony import */ var _remix_run_router__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! @remix-run/router */ "./node_modules/@remix-run/router/dist/router.js");
 /**
- * React Router DOM v6.14.2
+ * React Router DOM v6.15.0
  *
  * Copyright (c) Remix Software Inc.
  *
@@ -29893,13 +29925,18 @@ function createSearchParams(init) {
 function getSearchParamsForLocation(locationSearch, defaultSearchParams) {
   let searchParams = createSearchParams(locationSearch);
   if (defaultSearchParams) {
-    for (let key of defaultSearchParams.keys()) {
+    // Use `defaultSearchParams.forEach(...)` here instead of iterating of
+    // `defaultSearchParams.keys()` to work-around a bug in Firefox related to
+    // web extensions. Relevant Bugzilla tickets:
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=1414602
+    // https://bugzilla.mozilla.org/show_bug.cgi?id=1023984
+    defaultSearchParams.forEach((_, key) => {
       if (!searchParams.has(key)) {
         defaultSearchParams.getAll(key).forEach(value => {
           searchParams.append(key, value);
         });
       }
-    }
+    });
   }
   return searchParams;
 }
@@ -30603,17 +30640,15 @@ function useFormAction(action, _temp2) {
     relative
   }));
   // Previously we set the default action to ".". The problem with this is that
-  // `useResolvedPath(".")` excludes search params and the hash of the resolved
-  // URL. This is the intended behavior of when "." is specifically provided as
+  // `useResolvedPath(".")` excludes search params of the resolved URL. This is
+  // the intended behavior of when "." is specifically provided as
   // the form action, but inconsistent w/ browsers when the action is omitted.
   // https://github.com/remix-run/remix/issues/927
   let location = Object(react_router__WEBPACK_IMPORTED_MODULE_1__["useLocation"])();
   if (action == null) {
-    // Safe to write to these directly here since if action was undefined, we
+    // Safe to write to this directly here since if action was undefined, we
     // would have called useResolvedPath(".") which will never include a search
-    // or hash
     path.search = location.search;
-    path.hash = location.hash;
     // When grabbing search params from the URL, remove the automatically
     // inserted ?index param so we match the useResolvedPath search behavior
     // which would not include ?index
@@ -30851,20 +30886,23 @@ function usePrompt(_ref8) {
   } = _ref8;
   let blocker = Object(react_router__WEBPACK_IMPORTED_MODULE_1__["unstable_useBlocker"])(when);
   react__WEBPACK_IMPORTED_MODULE_0__["useEffect"](() => {
-    if (blocker.state === "blocked" && !when) {
-      blocker.reset();
-    }
-  }, [blocker, when]);
-  react__WEBPACK_IMPORTED_MODULE_0__["useEffect"](() => {
     if (blocker.state === "blocked") {
       let proceed = window.confirm(message);
       if (proceed) {
+        // This timeout is needed to avoid a weird "race" on POP navigations
+        // between the `window.history` revert navigation and the result of
+        // `window.confirm`
         setTimeout(blocker.proceed, 0);
       } else {
         blocker.reset();
       }
     }
   }, [blocker, message]);
+  react__WEBPACK_IMPORTED_MODULE_0__["useEffect"](() => {
+    if (blocker.state === "blocked" && !when) {
+      blocker.reset();
+    }
+  }, [blocker, when]);
 }
 //#endregion
 
@@ -30878,7 +30916,7 @@ function usePrompt(_ref8) {
 /*!*************************************************!*\
   !*** ./node_modules/react-router/dist/index.js ***!
   \*************************************************/
-/*! exports provided: AbortedDeferredError, NavigationType, createPath, defer, generatePath, isRouteErrorResponse, json, matchPath, matchRoutes, parsePath, redirect, resolvePath, Await, MemoryRouter, Navigate, Outlet, Route, Router, RouterProvider, Routes, UNSAFE_DataRouterContext, UNSAFE_DataRouterStateContext, UNSAFE_LocationContext, UNSAFE_NavigationContext, UNSAFE_RouteContext, UNSAFE_mapRouteProperties, UNSAFE_useRouteId, UNSAFE_useRoutesImpl, createMemoryRouter, createRoutesFromChildren, createRoutesFromElements, renderMatches, unstable_useBlocker, useActionData, useAsyncError, useAsyncValue, useHref, useInRouterContext, useLoaderData, useLocation, useMatch, useMatches, useNavigate, useNavigation, useNavigationType, useOutlet, useOutletContext, useParams, useResolvedPath, useRevalidator, useRouteError, useRouteLoaderData, useRoutes */
+/*! exports provided: AbortedDeferredError, NavigationType, createPath, defer, generatePath, isRouteErrorResponse, json, matchPath, matchRoutes, parsePath, redirect, redirectDocument, resolvePath, Await, MemoryRouter, Navigate, Outlet, Route, Router, RouterProvider, Routes, UNSAFE_DataRouterContext, UNSAFE_DataRouterStateContext, UNSAFE_LocationContext, UNSAFE_NavigationContext, UNSAFE_RouteContext, UNSAFE_mapRouteProperties, UNSAFE_useRouteId, UNSAFE_useRoutesImpl, createMemoryRouter, createRoutesFromChildren, createRoutesFromElements, renderMatches, unstable_useBlocker, useActionData, useAsyncError, useAsyncValue, useHref, useInRouterContext, useLoaderData, useLocation, useMatch, useMatches, useNavigate, useNavigation, useNavigationType, useOutlet, useOutletContext, useParams, useResolvedPath, useRevalidator, useRouteError, useRouteLoaderData, useRoutes */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
@@ -30949,10 +30987,12 @@ __webpack_require__.r(__webpack_exports__);
 
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "redirect", function() { return _remix_run_router__WEBPACK_IMPORTED_MODULE_1__["redirect"]; });
 
+/* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "redirectDocument", function() { return _remix_run_router__WEBPACK_IMPORTED_MODULE_1__["redirectDocument"]; });
+
 /* harmony reexport (safe) */ __webpack_require__.d(__webpack_exports__, "resolvePath", function() { return _remix_run_router__WEBPACK_IMPORTED_MODULE_1__["resolvePath"]; });
 
 /**
- * React Router v6.14.2
+ * React Router v6.15.0
  *
  * Copyright (c) Remix Software Inc.
  *
@@ -31538,14 +31578,13 @@ function _renderMatches(matches, parentMatches, dataRouterState) {
     }) : getChildren();
   }, null);
 }
-var DataRouterHook;
-(function (DataRouterHook) {
+var DataRouterHook = /*#__PURE__*/function (DataRouterHook) {
   DataRouterHook["UseBlocker"] = "useBlocker";
   DataRouterHook["UseRevalidator"] = "useRevalidator";
   DataRouterHook["UseNavigateStable"] = "useNavigate";
-})(DataRouterHook || (DataRouterHook = {}));
-var DataRouterStateHook;
-(function (DataRouterStateHook) {
+  return DataRouterHook;
+}(DataRouterHook || {});
+var DataRouterStateHook = /*#__PURE__*/function (DataRouterStateHook) {
   DataRouterStateHook["UseBlocker"] = "useBlocker";
   DataRouterStateHook["UseLoaderData"] = "useLoaderData";
   DataRouterStateHook["UseActionData"] = "useActionData";
@@ -31556,7 +31595,8 @@ var DataRouterStateHook;
   DataRouterStateHook["UseRevalidator"] = "useRevalidator";
   DataRouterStateHook["UseNavigateStable"] = "useNavigate";
   DataRouterStateHook["UseRouteId"] = "useRouteId";
-})(DataRouterStateHook || (DataRouterStateHook = {}));
+  return DataRouterStateHook;
+}(DataRouterStateHook || {});
 function getDataRouterConsoleError(hookName) {
   return hookName + " must be used within a data router.  See https://reactrouter.com/routers/picking-a-router.";
 }
@@ -31607,10 +31647,10 @@ function useNavigation() {
 function useRevalidator() {
   let dataRouterContext = useDataRouterContext(DataRouterHook.UseRevalidator);
   let state = useDataRouterState(DataRouterStateHook.UseRevalidator);
-  return {
+  return react__WEBPACK_IMPORTED_MODULE_0__["useMemo"](() => ({
     revalidate: dataRouterContext.router.revalidate,
     state: state.revalidation
-  };
+  }), [dataRouterContext.router.revalidate, state.revalidation]);
 }
 
 /**
@@ -32095,12 +32135,12 @@ function Await(_ref7) {
     errorElement: errorElement
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__["createElement"](ResolveAwait, null, children));
 }
-var AwaitRenderStatus;
-(function (AwaitRenderStatus) {
+var AwaitRenderStatus = /*#__PURE__*/function (AwaitRenderStatus) {
   AwaitRenderStatus[AwaitRenderStatus["pending"] = 0] = "pending";
   AwaitRenderStatus[AwaitRenderStatus["success"] = 1] = "success";
   AwaitRenderStatus[AwaitRenderStatus["error"] = 2] = "error";
-})(AwaitRenderStatus || (AwaitRenderStatus = {}));
+  return AwaitRenderStatus;
+}(AwaitRenderStatus || {});
 const neverSettledPromise = new Promise(() => {});
 class AwaitErrorBoundary extends react__WEBPACK_IMPORTED_MODULE_0__["Component"] {
   constructor(props) {

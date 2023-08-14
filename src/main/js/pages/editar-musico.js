@@ -1,9 +1,9 @@
 const React = require('react');
 const {useParams, Link} = require('react-router-dom');
 
-const PageEditarMusico = ()=>{
+const PageEditarMusico = () =>{
 
-    const {id} = useParams();
+    let {id} = useParams();
 
     return(
         <>
@@ -14,4 +14,4 @@ const PageEditarMusico = ()=>{
 
 }
 
-module.exports = PageEditarMusico
+module.exports = PageEditarMusico;
